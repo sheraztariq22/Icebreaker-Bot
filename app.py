@@ -6,6 +6,7 @@ import logging
 import uuid
 import gradio as gr
 
+
 from modules.data_extraction import extract_linkedin_profile
 from modules.data_processing import split_profile_data, create_vector_database, verify_embeddings
 from modules.llm_interface import change_llm_model
@@ -198,7 +199,7 @@ if __name__ == "__main__":
     # - share=True creates a public link you can share with others
     # - server_name and server_port set where the app runs
     demo.launch(
-        server_name="127.0.0.1",  
+        server_name="0.0.0.0",  
         server_port=5000,
-        share=True  # Set to False if you don't want to create a public link
+        share=True  
     )

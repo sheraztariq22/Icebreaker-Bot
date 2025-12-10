@@ -1,15 +1,22 @@
 """Configuration settings for the Icebreaker Bot."""
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # IBM watsonx.ai settings
-WATSONX_URL = "https://us-south.ml.cloud.ibm.com"
-WATSONX_PROJECT_ID = "skills-network"
+WATSONX_APIKEY = os.getenv("WATSONX_APIKEY", "")
+WATSONX_URL = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
+WATSONX_PROJECT_ID = os.getenv("WATSONX_PROJECT_ID", "skills-network")
 
 # Model settings
 LLM_MODEL_ID = "ibm/granite-3-2-8b-instruct"
 EMBEDDING_MODEL_ID = "ibm/slate-125m-english-rtrvr-v2"
 
 # ProxyCurl API settings
-PROXYCURL_API_KEY = ""  # Replace with your API key
+PROXYCURL_API_KEY = os.getenv("PROXYCURL_API_KEY", "")
 
 # Mock data URL
 MOCK_DATA_URL = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/ZRe59Y_NJyn3hZgnF1iFYA/linkedin-profile-data.json"
