@@ -126,23 +126,6 @@ You are an AI assistant that provides detailed answers based on the provided con
 
 ## 👩‍💻 Development
 
-### For Beginners
-
-If you're learning to build this project from scratch, check out the `1-start` branch:
-
-```bash
-git checkout 1-start
-```
-
-This branch contains starter files with TODOs and guidance for implementation.
-
-### Running Tests
-
-Test individual components:
-
-```bash
-# Test data extraction
-python -c "from modules.data_extraction import extract_linkedin_profile; print(extract_linkedin_profile('https://www.linkedin.com/in/username/', mock=True))"
 
 # Test the entire pipeline
 python main.py --mock --test
