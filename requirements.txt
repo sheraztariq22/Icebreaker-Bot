@@ -1,0 +1,11 @@
+llama-index-core==0.11.8
+llama-index-llms-ibm==0.2.0
+llama-index-embeddings-ibm==0.2.0
+llama-index-readers-web==0.2.2
+llama-hub==0.0.79.post1
+requests==2.32.2
+pydantic==2.10.6
+
+# FIXED VERSIONS
+gradio==4.19.2
+huggingface_hub==0.20.3
