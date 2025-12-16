@@ -74,8 +74,45 @@ SIMILARITY_TOP_K = 3
 # Directory for storing mock data
 MOCK_DATA_DIR = "mock_data"
 
+# Mock data URL (fallback if local file not found)
+MOCK_DATA_URL = "https://gist.githubusercontent.com/emarco177/0d6a3f93dd06634d95e46a2782ed7490/raw/fad4d7a87e3e934ad52ba2a968bad9eb45128665/eden-marco.json"
+
 # Logging level
 LOG_LEVEL = "INFO"
+
+# ============================================================================
+# Prompt Templates
+# ============================================================================
+
+# Template for generating initial facts about a profile
+INITIAL_FACTS_TEMPLATE = """Context information is below.
+---------------------
+{context_str}
+---------------------
+Given the context information and not prior knowledge, provide three interesting and specific facts about this person's career or education.
+Be detailed and cite actual information from the profile.
+
+Format your response as:
+1. [First fact]
+2. [Second fact]
+3. [Third fact]
+
+Facts:
+"""
+
+# Template for answering user questions about a profile
+USER_QUESTION_TEMPLATE = """Context information is below.
+---------------------
+{context_str}
+---------------------
+Given the context information and not prior knowledge, answer the question: {query_str}
+
+If the answer is not in the context, say "I don't have enough information to answer that question based on the profile."
+
+Provide a clear, concise answer based only on the information provided.
+
+Answer:
+"""
 
 # ============================================================================
 # Validation

@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional
 from llama_index.core import Document, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
 
-from modules.llm_interface import create_watsonx_embedding
+from modules.llm_interface import get_embed_model
 import config
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,8 @@ def create_vector_database(nodes: List) -> Optional[VectorStoreIndex]:
         VectorStoreIndex or None if indexing fails.
     """
     try:
-        # Get the embedding model
-        embedding_model = create_watsonx_embedding()
+        # Get the Gemini embedding model
+        embedding_model = get_embed_model()
 
         # Create a VectorStoreIndex from the nodes
         index = VectorStoreIndex(
