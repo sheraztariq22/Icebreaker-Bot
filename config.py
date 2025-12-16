@@ -36,7 +36,7 @@ EMBEDDING_MODEL = "models/text-embedding-004"
 LLM_TEMPERATURE = 0.7
 
 # Maximum tokens to generate
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 
 # Top-p sampling (0.0-1.0)
 TOP_P = 0.95
