@@ -31,7 +31,7 @@ def generate_initial_facts(index: VectorStoreIndex) -> str:
 {context_str}
 ---------------------
 Given the context information and not prior knowledge, provide three interesting facts about this person's career or education.
-Be specific and cite actual information from the profile.
+Be specific and cite actual information from the profile. Keep each fact concise (1-2 sentences).
 
 Facts:
 """)
@@ -47,14 +47,22 @@ Facts:
         )
         
         # Execute the query
-        query = "Provide three interesting facts about this person's career or education."
+        query = "Provide three interesting facts about this person's career or education. Keep each fact brief."
         response = query_engine.query(query)
         
         # Return the facts
         return response.response
     except Exception as e:
-        logger.error(f"Error in generate_initial_facts: {e}")
-        return "Failed to generate initial facts."
+        error_msg = str(e)
+        logger.error(f"Error in generate_initial_facts: {error_msg}")
+        
+        # Handle specific error cases
+        if "MAX_TOKENS" in error_msg or "terminated early" in error_msg:
+            return "Profile processed successfully, but the response was too long. Try asking specific questions in the Chat tab instead."
+        elif "RATE_LIMIT" in error_msg or "quota" in error_msg.lower():
+            return "Rate limit exceeded. Please wait a moment and try again."
+        else:
+            return f"Failed to generate initial facts. Error: {error_msg}"
 
 def answer_user_query(index: VectorStoreIndex, user_query: str) -> Any:
     """Answers the user's question using the vector database and the LLM.
