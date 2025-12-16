@@ -1,12 +1,56 @@
+# ============================================================================
+# LinkedIn Icebreaker Bot - Google Gemini Edition
+# Updated Requirements (Migrated from IBM watsonx)
+# ============================================================================
+
+# ============================================================================
+# Core LlamaIndex - Keep same version for compatibility
+# ============================================================================
 llama-index-core==0.11.8
-llama-index-llms-ibm==0.2.0
-llama-index-embeddings-ibm==0.2.0
+
+# ============================================================================
+# Google Gemini Integration (REPLACING IBM watsonx)
+# ============================================================================
+# Remove these IBM packages:
+# llama-index-llms-ibm==0.2.0
+# llama-index-embeddings-ibm==0.2.0
+
+# Add these Gemini packages:
+google-genai>=1.0.0
+llama-index-llms-google-genai>=0.2.0
+llama-index-embeddings-google-genai>=0.2.0
+
+# ============================================================================
+# Keep Existing Dependencies (No Changes)
+# ============================================================================
 llama-index-readers-web==0.2.2
-llama-hub==0.0.45  # replaced with latest available
+llama-hub==0.0.45
 
 requests==2.32.2
 pydantic==2.10.6
 
-# FIXED VERSIONS
+# ============================================================================
+# Web Interface - Keep Your Fixed Versions
+# ============================================================================
 gradio==4.19.2
 huggingface_hub==0.20.3
+
+# ============================================================================
+# Environment Management
+# ============================================================================
+python-dotenv>=1.0.0
+
+# ============================================================================
+# Installation Instructions
+# ============================================================================
+# 
+# Step 1: Remove old IBM packages
+#   pip uninstall -y llama-index-llms-ibm llama-index-embeddings-ibm
+#
+# Step 2: Install new requirements
+#   pip install -r requirements.txt
+#
+# Step 3: Verify installation
+#   python test_gemini.py
+#
+# ============================================================================

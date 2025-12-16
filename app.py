@@ -1,11 +1,10 @@
-"""Gradio web interface for the Icebreaker Bot."""
+"""Gradio web interface for the Icebreaker Bot with Google Gemini."""
 
 import os
 import sys
 import logging
 import uuid
 import gradio as gr
-
 
 from modules.data_extraction import extract_linkedin_profile
 from modules.data_processing import split_profile_data, create_vector_database, verify_embeddings
@@ -126,39 +125,97 @@ def chat_with_profile(session_id, user_query, chat_history):
 
 def create_gradio_interface():
     """Create the Gradio interface for the Icebreaker Bot."""
-    # Define available LLM models
+    # Define available Gemini models
     available_models = [
-        "ibm/granite-3-2-8b-instruct",
-        "meta-llama/llama-3-3-70b-instruct"
+        ("Gemini 2.5 Flash (Recommended)", "gemini-2.5-flash"),
+        ("Gemini 2.5 Pro (Highest Quality)", "gemini-2.5-pro"),
+        ("Gemini 1.5 Flash (Previous Gen)", "gemini-1.5-flash"),
+        ("Gemini 1.5 Pro (Previous Gen Pro)", "gemini-1.5-pro"),
     ]
     
-    with gr.Blocks(title="LinkedIn Icebreaker Bot") as demo:
-        gr.Markdown("# LinkedIn Icebreaker Bot")
-        gr.Markdown("Generate personalized icebreakers and chat about LinkedIn profiles")
+    # Create custom CSS for better styling
+    custom_css = """
+    .gradio-container {
+        font-family: 'Arial', sans-serif;
+    }
+    .tab-nav button {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    """
+    
+    with gr.Blocks(title="LinkedIn Icebreaker Bot", css=custom_css) as demo:
+        gr.Markdown(
+            """
+            # 🤝 LinkedIn Icebreaker Bot
+            ### Powered by Google Gemini AI
+            
+            Generate personalized icebreakers and chat about LinkedIn profiles using advanced AI.
+            """
+        )
         
-        with gr.Tab("Process LinkedIn Profile"):
+        with gr.Tab("🔍 Process LinkedIn Profile"):
+            gr.Markdown(
+                """
+                ### Step 1: Process a Profile
+                Enter a LinkedIn profile URL or use mock data to get started.
+                """
+            )
+            
             with gr.Row():
                 with gr.Column():
                     linkedin_url = gr.Textbox(
                         label="LinkedIn Profile URL",
-                        placeholder="https://www.linkedin.com/in/username/"
+                        placeholder="https://www.linkedin.com/in/username/",
+                        info="Paste the full LinkedIn profile URL here"
                     )
                     api_key = gr.Textbox(
-                        label="ProxyCurl API Key (Leave empty to use mock data)",
+                        label="ProxyCurl API Key (Optional - Leave empty for mock data)",
                         placeholder="Your ProxyCurl API Key",
                         type="password",
-                        value=config.PROXYCURL_API_KEY
+                        value=config.PROXYCURL_API_KEY,
+                        info="Get your API key from https://nubela.co/proxycurl"
                     )
-                    use_mock = gr.Checkbox(label="Use Mock Data", value=True)
+                    use_mock = gr.Checkbox(
+                        label="Use Mock Data", 
+                        value=True,
+                        info="Enable to test without API key"
+                    )
                     model_dropdown = gr.Dropdown(
-                        choices=available_models,
-                        label="Select LLM Model",
-                        value=config.LLM_MODEL_ID
+                        choices=[model[1] for model in available_models],
+                        label="Select Gemini Model",
+                        value=config.LLM_MODEL_ID,
+                        info="Choose the AI model (Flash recommended for speed and cost)"
                     )
-                    process_btn = gr.Button("Process Profile")
+                    
+                    with gr.Accordion("ℹ️ Model Information", open=False):
+                        gr.Markdown(
+                            """
+                            **Gemini 2.5 Flash** (Recommended)
+                            - Fast responses, low cost
+                            - Excellent quality for most use cases
+                            - 1M token context window
+                            
+                            **Gemini 2.5 Pro** (Premium)
+                            - Highest quality responses
+                            - Best for complex analysis
+                            - 2M token context window
+                            - Higher cost
+                            
+                            **Older Models**
+                            - Previous generation models
+                            - Still good, but newer models recommended
+                            """
+                        )
+                    
+                    process_btn = gr.Button("🚀 Process Profile", variant="primary")
                 
                 with gr.Column():
-                    result_text = gr.Textbox(label="Initial Facts", lines=10)
+                    result_text = gr.Textbox(
+                        label="Initial Facts", 
+                        lines=10,
+                        placeholder="Interesting facts about the profile will appear here..."
+                    )
                     session_id = gr.Textbox(label="Session ID", visible=False)
             
             process_btn.click(
@@ -167,16 +224,37 @@ def create_gradio_interface():
                 outputs=[result_text, session_id]
             )
         
-        with gr.Tab("Chat"):
-            gr.Markdown("Chat with the processed LinkedIn profile")
-            
-            chatbot = gr.Chatbot(height=500)
-            chat_input = gr.Textbox(
-                label="Ask a question about the profile",
-                placeholder="What is this person's current job title?"
+        with gr.Tab("💬 Chat"):
+            gr.Markdown(
+                """
+                ### Step 2: Chat with the Profile
+                Ask questions about the processed LinkedIn profile.
+                """
             )
             
-            chat_btn = gr.Button("Send")
+            chatbot = gr.Chatbot(
+                height=500,
+                placeholder="Process a profile first, then start chatting!"
+            )
+            
+            with gr.Row():
+                chat_input = gr.Textbox(
+                    label="Ask a question about the profile",
+                    placeholder="What is this person's current job title?",
+                    scale=4
+                )
+                chat_btn = gr.Button("Send", scale=1, variant="primary")
+            
+            gr.Markdown(
+                """
+                **Example questions:**
+                - What is this person's current role?
+                - What are their key skills?
+                - What companies have they worked at?
+                - What's an interesting icebreaker I could use?
+                - Suggest conversation topics based on their interests
+                """
+            )
             
             chat_btn.click(
                 fn=chat_with_profile,
@@ -189,17 +267,83 @@ def create_gradio_interface():
                 inputs=[session_id, chat_input, chatbot],
                 outputs=[chatbot]
             )
+        
+        with gr.Tab("ℹ️ About"):
+            gr.Markdown(
+                """
+                # About LinkedIn Icebreaker Bot
+                
+                ## 🎯 What is this?
+                This application uses Google's Gemini AI to analyze LinkedIn profiles and generate:
+                - Personalized conversation starters
+                - Interesting facts about professionals
+                - Interactive Q&A about profiles
+                
+                ## 🛠️ Technology Stack
+                - **AI Model:** Google Gemini (2.5 Flash or 2.5 Pro)
+                - **RAG Framework:** LlamaIndex
+                - **Embeddings:** Google Text Embedding 004
+                - **Web Interface:** Gradio
+                - **Data Source:** ProxyCurl API (or mock data)
+                
+                ## 🚀 How to Use
+                1. **Process a Profile:** Go to the "Process" tab and enter a LinkedIn URL
+                2. **Review Facts:** See automatically generated interesting facts
+                3. **Start Chatting:** Switch to the "Chat" tab and ask questions
+                
+                ## 🔑 API Keys
+                - **Gemini API Key:** Get free at [Google AI Studio](https://aistudio.google.com/app/apikey)
+                - **ProxyCurl API Key:** Optional, get at [ProxyCurl](https://nubela.co/proxycurl)
+                
+                ## 💡 Tips
+                - Start with mock data to test the system
+                - Use Gemini 2.5 Flash for best speed/cost balance
+                - Upgrade to Pro for highest quality analysis
+                - Ask specific questions for better responses
+                
+                ## 📊 Free Tier Limits
+                - 15 requests per minute
+                - 1,500 requests per day
+                - 1M tokens per minute
+                
+                ## 🔒 Privacy
+                - Your data is processed securely
+                - API keys are never shared
+                - Profile data is temporary (session-based)
+                
+                ---
+                
+                Built with ❤️ using Google Gemini AI
+                """
+            )
     
     return demo
 
 if __name__ == "__main__":
+    # Check if API key is configured
+    if not config.GEMINI_API_KEY:
+        print("\n" + "="*60)
+        print("⚠️  WARNING: GEMINI_API_KEY not found!")
+        print("="*60)
+        print("\nPlease set your Gemini API key in the .env file:")
+        print("1. Copy .env.example to .env")
+        print("2. Add your API key from: https://aistudio.google.com/app/apikey")
+        print("\nYou can still run the app, but it will fail when processing profiles.")
+        print("="*60 + "\n")
+    
     demo = create_gradio_interface()
+    
     # Launch the Gradio interface
-    # You can customize these parameters:
-    # - share=True creates a public link you can share with others
-    # - server_name and server_port set where the app runs
+    print("\n" + "="*60)
+    print("🚀 Starting LinkedIn Icebreaker Bot")
+    print("="*60)
+    print(f"\nUsing model: {config.LLM_MODEL_ID}")
+    print("Server will start on http://localhost:5000")
+    print("\nPress Ctrl+C to stop the server")
+    print("="*60 + "\n")
+    
     demo.launch(
         server_name="0.0.0.0",  
         server_port=5000,
-        share=True  
+        share=True  # Creates a public link - set to False for local only
     )
