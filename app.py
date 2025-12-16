@@ -98,16 +98,16 @@ def chat_with_profile(session_id, user_query, chat_history):
         chat_history: Chat history.
         
     Returns:
-        Updated chat history.
+        Updated chat history and cleared input.
     """
     if not session_id:
-        return chat_history + [[user_query, "No profile loaded. Please process a LinkedIn profile first."]]
+        return chat_history + [[user_query, "No profile loaded. Please process a LinkedIn profile first."]], ""
     
     if session_id not in active_indices:
-        return chat_history + [[user_query, "Session expired. Please process the LinkedIn profile again."]]
+        return chat_history + [[user_query, "Session expired. Please process the LinkedIn profile again."]], ""
     
     if not user_query.strip():
-        return chat_history
+        return chat_history, ""
     
     try:
         # Get the index for this session
@@ -117,34 +117,23 @@ def chat_with_profile(session_id, user_query, chat_history):
         response = answer_user_query(index, user_query)
         
         # Update chat history
-        return chat_history + [[user_query, response.response]]
+        return chat_history + [[user_query, response.response]], ""
     
     except Exception as e:
         logger.error(f"Error in chat_with_profile: {e}")
-        return chat_history + [[user_query, f"Error: {str(e)}"]]
+        return chat_history + [[user_query, f"Error: {str(e)}"]], ""
 
 def create_gradio_interface():
     """Create the Gradio interface for the Icebreaker Bot."""
     # Define available Gemini models
     available_models = [
-        ("Gemini 2.5 Flash (Recommended)", "gemini-2.5-flash"),
-        ("Gemini 2.5 Pro (Highest Quality)", "gemini-2.5-pro"),
-        ("Gemini 1.5 Flash (Previous Gen)", "gemini-1.5-flash"),
-        ("Gemini 1.5 Pro (Previous Gen Pro)", "gemini-1.5-pro"),
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
     ]
     
-    # Create custom CSS for better styling
-    custom_css = """
-    .gradio-container {
-        font-family: 'Arial', sans-serif;
-    }
-    .tab-nav button {
-        font-size: 16px;
-        font-weight: 600;
-    }
-    """
-    
-    with gr.Blocks(title="LinkedIn Icebreaker Bot", css=custom_css) as demo:
+    with gr.Blocks(title="LinkedIn Icebreaker Bot") as demo:
         gr.Markdown(
             """
             # 🤝 LinkedIn Icebreaker Bot
@@ -153,6 +142,9 @@ def create_gradio_interface():
             Generate personalized icebreakers and chat about LinkedIn profiles using advanced AI.
             """
         )
+        
+        # Hidden state for session ID
+        session_id = gr.State(value=None)
         
         with gr.Tab("🔍 Process LinkedIn Profile"):
             gr.Markdown(
@@ -173,7 +165,7 @@ def create_gradio_interface():
                         label="ProxyCurl API Key (Optional - Leave empty for mock data)",
                         placeholder="Your ProxyCurl API Key",
                         type="password",
-                        value=config.PROXYCURL_API_KEY,
+                        value=config.PROXYCURL_API_KEY or "",
                         info="Get your API key from https://nubela.co/proxycurl"
                     )
                     use_mock = gr.Checkbox(
@@ -182,7 +174,7 @@ def create_gradio_interface():
                         info="Enable to test without API key"
                     )
                     model_dropdown = gr.Dropdown(
-                        choices=[model[1] for model in available_models],
+                        choices=available_models,
                         label="Select Gemini Model",
                         value=config.LLM_MODEL_ID,
                         info="Choose the AI model (Flash recommended for speed and cost)"
@@ -201,10 +193,6 @@ def create_gradio_interface():
                             - Best for complex analysis
                             - 2M token context window
                             - Higher cost
-                            
-                            **Older Models**
-                            - Previous generation models
-                            - Still good, but newer models recommended
                             """
                         )
                     
@@ -213,10 +201,9 @@ def create_gradio_interface():
                 with gr.Column():
                     result_text = gr.Textbox(
                         label="Initial Facts", 
-                        lines=10,
+                        lines=12,
                         placeholder="Interesting facts about the profile will appear here..."
                     )
-                    session_id = gr.Textbox(label="Session ID", visible=False)
             
             process_btn.click(
                 fn=process_profile,
@@ -232,9 +219,10 @@ def create_gradio_interface():
                 """
             )
             
+            # Chatbot without placeholder (not supported in Gradio 4.19.2)
             chatbot = gr.Chatbot(
                 height=500,
-                placeholder="Process a profile first, then start chatting!"
+                label="Chat History"
             )
             
             with gr.Row():
@@ -256,16 +244,17 @@ def create_gradio_interface():
                 """
             )
             
+            # Update chat function to clear input
             chat_btn.click(
                 fn=chat_with_profile,
                 inputs=[session_id, chat_input, chatbot],
-                outputs=[chatbot]
+                outputs=[chatbot, chat_input]
             )
             
             chat_input.submit(
                 fn=chat_with_profile,
                 inputs=[session_id, chat_input, chatbot],
-                outputs=[chatbot]
+                outputs=[chatbot, chat_input]
             )
         
         with gr.Tab("ℹ️ About"):
@@ -306,14 +295,11 @@ def create_gradio_interface():
                 - 1,500 requests per day
                 - 1M tokens per minute
                 
-                ## 🔒 Privacy
-                - Your data is processed securely
-                - API keys are never shared
-                - Profile data is temporary (session-based)
-                
                 ---
                 
-                Built with ❤️ using Google Gemini AI
+                **Built with ❤️ using Google Gemini AI**
+                
+                Version: 2.0 (Gemini Edition)
                 """
             )
     
