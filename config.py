@@ -45,14 +45,16 @@ TOP_P = 0.95
 TOP_K = 40
 
 # ============================================================================
-# ProxyCurl Configuration (LinkedIn Scraping)
+# LinkedIn Scraping Configuration (Free - Using linkedin-api)
 # ============================================================================
 
-# ProxyCurl API key for LinkedIn profile extraction
-PROXYCURL_API_KEY = os.environ.get("PROXYCURL_API_KEY")
+# LinkedIn credentials for scraping (optional - use mock data if not provided)
+# Get these from your personal LinkedIn account
+LINKEDIN_EMAIL = os.environ.get("LINKEDIN_EMAIL")
+LINKEDIN_PASSWORD = os.environ.get("LINKEDIN_PASSWORD")
 
-# ProxyCurl API endpoint
-PROXYCURL_API_ENDPOINT = "https://nubela.co/proxycurl/api/v2/linkedin"
+# Note: Using your LinkedIn credentials is optional
+# If not provided, the app will use mock data automatically
 
 # ============================================================================
 # Vector Database Configuration
@@ -90,12 +92,12 @@ INITIAL_FACTS_TEMPLATE = """Context information is below.
 {context_str}
 ---------------------
 Given the context information and not prior knowledge, provide three interesting and specific facts about this person's career or education.
-Be detailed and cite actual information from the profile.
+Be concise - keep each fact to 1-2 sentences maximum.
 
 Format your response as:
-1. [First fact]
-2. [Second fact]
-3. [Third fact]
+1. [First fact - 1-2 sentences]
+2. [Second fact - 1-2 sentences]  
+3. [Third fact - 1-2 sentences]
 
 Facts:
 """

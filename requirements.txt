@@ -26,6 +26,13 @@ llama-index-embeddings-google-genai>=0.2.0
 llama-index-readers-web==0.2.2
 llama-hub==0.0.45
 
+# ============================================================================
+# Data Extraction & Processing
+# ============================================================================
+
+# FREE LinkedIn Scraper (replaces ProxyCurl)
+linkedin-api>=2.0.0
+
 requests==2.32.2
 pydantic==2.10.6
 

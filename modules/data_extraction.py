@@ -1,11 +1,18 @@
-"""Module for extracting LinkedIn profile data."""
+"""Module for extracting LinkedIn profile data using free linkedin-api library."""
 
 import time
-import requests
-import logging
 import json
 import os
+import logging
 from typing import Dict, Optional, Any
+
+# Try to import linkedin_api, if not available fall back to mock data
+try:
+    from linkedin_api import Linkedin
+    LINKEDIN_API_AVAILABLE = True
+except ImportError:
+    LINKEDIN_API_AVAILABLE = False
+    print("⚠️  linkedin_api not installed. Install with: pip install linkedin-api")
 
 import config
 
@@ -13,15 +20,17 @@ logger = logging.getLogger(__name__)
 
 def extract_linkedin_profile(
     linkedin_profile_url: str, 
-    api_key: Optional[str] = None, 
+    linkedin_email: Optional[str] = None,
+    linkedin_password: Optional[str] = None,
     mock: bool = False
 ) -> Dict[str, Any]:
-    """Extract LinkedIn profile data using ProxyCurl API or loads a premade JSON file.
+    """Extract LinkedIn profile data using linkedin-api or mock data.
     
     Args:
         linkedin_profile_url: The LinkedIn profile URL to extract data from.
-        api_key: ProxyCurl API key. Required if mock is False.
-        mock: If True, loads mock data from a premade JSON file instead of using the API.
+        linkedin_email: LinkedIn account email (optional, for real scraping).
+        linkedin_password: LinkedIn account password (optional, for real scraping).
+        mock: If True, loads mock data instead of scraping.
     
     Returns:
         Dictionary containing the LinkedIn profile data.
@@ -30,86 +39,221 @@ def extract_linkedin_profile(
     
     try:
         if mock:
-            logger.info("Using mock data from a premade JSON file...")
-            
-            # Try to load from local file first
-            mock_data_path = os.path.join(config.MOCK_DATA_DIR, "mock_profile.json")
-            
-            if os.path.exists(mock_data_path):
-                logger.info(f"Loading mock data from {mock_data_path}")
-                with open(mock_data_path, 'r') as f:
-                    data = json.load(f)
-            else:
-                # Fallback to URL if local file doesn't exist
-                logger.info("Local mock file not found, trying URL...")
-                mock_url = getattr(config, 'MOCK_DATA_URL', 
-                    "https://gist.githubusercontent.com/emarco177/0d6a3f93dd06634d95e46a2782ed7490/raw/fad4d7a87e3e934ad52ba2a968bad9eb45128665/eden-marco.json")
-                response = requests.get(mock_url, timeout=30)
-                response.raise_for_status()
-                data = response.json()
-        else:
-            # Ensure API key is provided when mock is False
-            if not api_key:
-                raise ValueError("ProxyCurl API key is required when mock is set to False.")
-            
-            logger.info("Starting to extract the LinkedIn profile...")
-            
-            # Validate and clean the LinkedIn URL
-            linkedin_profile_url = linkedin_profile_url.strip()
-            if not linkedin_profile_url.startswith("http"):
-                linkedin_profile_url = "https://" + linkedin_profile_url
-            
-            logger.info(f"Processing LinkedIn URL: {linkedin_profile_url}")
-            
-            # Set up the API endpoint and headers
-            # ProxyCurl uses v2 endpoint
-            api_endpoint = "https://nubela.co/proxycurl/api/v2/linkedin"
-            headers = {
-                "Authorization": f"Bearer {api_key}"
-            }
-            
-            # Prepare parameters for the request
-            params = {
-                "url": linkedin_profile_url,
-                "fallback_to_cache": "on-error",
-                "use_cache": "if-present",
-                "skills": "include",
-                "inferred_salary": "include",
-                "personal_email": "include",
-                "personal_contact_number": "include"
-            }
-            
-            logger.info(f"Sending API request to ProxyCurl at {time.time() - start_time:.2f} seconds...")
-            logger.info(f"API Endpoint: {api_endpoint}")
-            
-            # Send API request
-            response = requests.get(api_endpoint, headers=headers, params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
+            logger.info("Using mock data from file...")
+            return load_mock_data()
         
-        logger.info(f"Received response at {time.time() - start_time:.2f} seconds...")
+        # Check if linkedin_api is available
+        if not LINKEDIN_API_AVAILABLE:
+            logger.warning("linkedin_api not installed, falling back to mock data")
+            return load_mock_data()
         
-        # Clean the data, remove empty values and unwanted fields
-        data = {
-            k: v
-            for k, v in data.items()
-            if v not in ([], "", None) and k not in ["people_also_viewed", "certifications"]
-        }
+        # Extract username from LinkedIn URL
+        username = extract_username_from_url(linkedin_profile_url)
+        if not username:
+            logger.error("Could not extract username from LinkedIn URL")
+            return {}
         
-        # Remove profile picture URLs from groups to clean the data
-        if data.get("groups"):
-            for group_dict in data.get("groups"):
-                group_dict.pop("profile_pic_url", None)
+        # Get credentials from environment or parameters
+        email = linkedin_email or os.environ.get("LINKEDIN_EMAIL")
+        password = linkedin_password or os.environ.get("LINKEDIN_PASSWORD")
+        
+        if not email or not password:
+            logger.warning("LinkedIn credentials not provided, using mock data")
+            logger.info("To use real LinkedIn scraping, set LINKEDIN_EMAIL and LINKEDIN_PASSWORD in .env")
+            return load_mock_data()
+        
+        logger.info(f"Extracting LinkedIn profile for: {username}")
+        
+        # Authenticate with LinkedIn
+        api = Linkedin(email, password)
+        
+        # Get profile data
+        logger.info(f"Fetching profile data at {time.time() - start_time:.2f} seconds...")
+        profile_data = api.get_profile(username)
         
         logger.info(f"Successfully extracted profile data in {time.time() - start_time:.2f} seconds")
-        return data
+        
+        # Clean and format the data
+        cleaned_data = clean_profile_data(profile_data)
+        
+        return cleaned_data
             
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request error in extract_linkedin_profile: {e}")
-        return {}
-    except ValueError as e:
-        logger.error(f"JSON parsing error: {e}")
-        return {}
     except Exception as e:
         logger.error(f"Error in extract_linkedin_profile: {e}")
+        logger.info("Falling back to mock data")
+        return load_mock_data()
+
+def extract_username_from_url(url: str) -> Optional[str]:
+    """Extract username from LinkedIn profile URL.
+    
+    Args:
+        url: LinkedIn profile URL
+        
+    Returns:
+        Username string or None if extraction fails
+    """
+    try:
+        # Remove trailing slash
+        url = url.rstrip('/')
+        
+        # Handle different URL formats
+        # https://www.linkedin.com/in/username/
+        # https://linkedin.com/in/username
+        # www.linkedin.com/in/username
+        
+        if '/in/' in url:
+            username = url.split('/in/')[-1].split('/')[0].split('?')[0]
+            return username
+        
+        logger.error(f"Invalid LinkedIn URL format: {url}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error extracting username from URL: {e}")
+        return None
+
+def load_mock_data() -> Dict[str, Any]:
+    """Load mock LinkedIn profile data.
+    
+    Returns:
+        Dictionary containing mock profile data
+    """
+    try:
+        # Try to load from local file first
+        mock_data_path = os.path.join(config.MOCK_DATA_DIR, "mock_profile.json")
+        
+        if os.path.exists(mock_data_path):
+            logger.info(f"Loading mock data from {mock_data_path}")
+            with open(mock_data_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        
+        # Fallback to hardcoded mock data
+        logger.info("Using hardcoded mock data")
+        return {
+            "full_name": "Eden Marco",
+            "headline": "AI Engineer | Building Intelligent Systems",
+            "summary": "Passionate about AI, machine learning, and building systems that make a difference. Experienced in Python, NLP, and computer vision.",
+            "location": "Tel Aviv, Israel",
+            "country": "Israel",
+            "experiences": [
+                {
+                    "title": "Senior AI Engineer",
+                    "company": "Tech Innovations Ltd",
+                    "location": "Tel Aviv",
+                    "starts_at": {"year": 2020, "month": 1},
+                    "ends_at": None,
+                    "description": "Leading AI projects in natural language processing and computer vision"
+                },
+                {
+                    "title": "Machine Learning Engineer",
+                    "company": "DataCorp",
+                    "location": "Tel Aviv",
+                    "starts_at": {"year": 2018, "month": 6},
+                    "ends_at": {"year": 2019, "month": 12},
+                    "description": "Developed ML models for predictive analytics"
+                }
+            ],
+            "education": [
+                {
+                    "school": "Tel Aviv University",
+                    "degree": "Bachelor of Science",
+                    "field_of_study": "Computer Science",
+                    "starts_at": {"year": 2014},
+                    "ends_at": {"year": 2018}
+                }
+            ],
+            "skills": [
+                "Python",
+                "Machine Learning",
+                "Deep Learning",
+                "Natural Language Processing",
+                "Computer Vision",
+                "TensorFlow",
+                "PyTorch",
+                "Docker",
+                "Kubernetes"
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error loading mock data: {e}")
         return {}
+
+def clean_profile_data(profile_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Clean and format profile data to match expected structure.
+    
+    Args:
+        profile_data: Raw profile data from linkedin-api
+        
+    Returns:
+        Cleaned and formatted profile data
+    """
+    try:
+        # The linkedin-api returns data in a different format than ProxyCurl
+        # We need to transform it to match our expected structure
+        
+        cleaned = {
+            "full_name": profile_data.get("firstName", "") + " " + profile_data.get("lastName", ""),
+            "headline": profile_data.get("headline", ""),
+            "summary": profile_data.get("summary", ""),
+            "location": profile_data.get("locationName", ""),
+            "country": profile_data.get("geoCountryName", ""),
+        }
+        
+        # Extract experiences
+        experiences = []
+        for exp in profile_data.get("experience", []):
+            experience = {
+                "title": exp.get("title", ""),
+                "company": exp.get("companyName", ""),
+                "location": exp.get("locationName", ""),
+                "starts_at": {
+                    "year": exp.get("timePeriod", {}).get("startDate", {}).get("year"),
+                    "month": exp.get("timePeriod", {}).get("startDate", {}).get("month")
+                },
+                "ends_at": {
+                    "year": exp.get("timePeriod", {}).get("endDate", {}).get("year"),
+                    "month": exp.get("timePeriod", {}).get("endDate", {}).get("month")
+                } if exp.get("timePeriod", {}).get("endDate") else None,
+                "description": exp.get("description", "")
+            }
+            experiences.append(experience)
+        cleaned["experiences"] = experiences
+        
+        # Extract education
+        education = []
+        for edu in profile_data.get("education", []):
+            education_item = {
+                "school": edu.get("schoolName", ""),
+                "degree": edu.get("degreeName", ""),
+                "field_of_study": edu.get("fieldOfStudy", ""),
+                "starts_at": {
+                    "year": edu.get("timePeriod", {}).get("startDate", {}).get("year")
+                },
+                "ends_at": {
+                    "year": edu.get("timePeriod", {}).get("endDate", {}).get("year")
+                } if edu.get("timePeriod", {}).get("endDate") else None
+            }
+            education.append(education_item)
+        cleaned["education"] = education
+        
+        # Extract skills
+        skills = []
+        for skill in profile_data.get("skills", []):
+            if isinstance(skill, dict):
+                skills.append(skill.get("name", ""))
+            else:
+                skills.append(str(skill))
+        cleaned["skills"] = skills
+        
+        # Remove empty values
+        cleaned = {
+            k: v for k, v in cleaned.items()
+            if v not in ([], "", None, {})
+        }
+        
+        return cleaned
+        
+    except Exception as e:
+        logger.error(f"Error cleaning profile data: {e}")
+        return profile_data
