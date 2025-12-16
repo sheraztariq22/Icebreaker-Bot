@@ -44,39 +44,85 @@ def extract_linkedin_profile(
         
         # Check if linkedin_api is available
         if not LINKEDIN_API_AVAILABLE:
-            logger.warning("linkedin_api not installed, falling back to mock data")
+            logger.error("linkedin_api not installed. Install it with: pip install linkedin-api")
+            logger.warning("Falling back to mock data")
             return load_mock_data()
         
         # Extract username from LinkedIn URL
         username = extract_username_from_url(linkedin_profile_url)
         if not username:
-            logger.error("Could not extract username from LinkedIn URL")
-            return {}
+            logger.error(f"Could not extract username from LinkedIn URL: {linkedin_profile_url}")
+            logger.info("Falling back to mock data")
+            return load_mock_data()
         
         # Get credentials from environment or parameters
         email = linkedin_email or os.environ.get("LINKEDIN_EMAIL")
         password = linkedin_password or os.environ.get("LINKEDIN_PASSWORD")
         
         if not email or not password:
-            logger.warning("LinkedIn credentials not provided, using mock data")
-            logger.info("To use real LinkedIn scraping, set LINKEDIN_EMAIL and LINKEDIN_PASSWORD in .env")
+            logger.warning("LinkedIn credentials not provided")
+            logger.info("To use real LinkedIn scraping, provide email and password or set LINKEDIN_EMAIL and LINKEDIN_PASSWORD in .env")
+            logger.info("Falling back to mock data")
             return load_mock_data()
         
-        logger.info(f"Extracting LinkedIn profile for: {username}")
+        logger.info(f"Attempting to authenticate with LinkedIn as: {email}")
         
-        # Authenticate with LinkedIn
-        api = Linkedin(email, password)
         
-        # Get profile data
-        logger.info(f"Fetching profile data at {time.time() - start_time:.2f} seconds...")
-        profile_data = api.get_profile(username)
+        logger.info(f"Extracting LinkedIn profile for username: {username}")
         
-        logger.info(f"Successfully extracted profile data in {time.time() - start_time:.2f} seconds")
-        
-        # Clean and format the data
-        cleaned_data = clean_profile_data(profile_data)
-        
-        return cleaned_data
+        try:
+            # Authenticate with LinkedIn
+            logger.info("Authenticating with LinkedIn...")
+            api = Linkedin(email, password)
+            logger.info("✓ Authentication successful!")
+            
+            # Get profile data
+            logger.info(f"Fetching profile data for '{username}' at {time.time() - start_time:.2f} seconds...")
+            profile_data = api.get_profile(username)
+            
+            if not profile_data:
+                logger.error(f"No data returned for profile: {username}")
+                logger.info("Falling back to mock data")
+                return load_mock_data()
+            
+            logger.info(f"✓ Successfully extracted profile data in {time.time() - start_time:.2f} seconds")
+            
+            # Clean and format the data
+            cleaned_data = clean_profile_data(profile_data)
+            
+            # Log what we got
+            logger.info(f"Extracted profile: {cleaned_data.get('full_name', 'Unknown')}")
+            
+            return cleaned_data
+            
+        except Exception as auth_error:
+            logger.error(f"LinkedIn API error: {str(auth_error)}")
+            
+            # Check for specific errors
+            error_msg = str(auth_error).lower()
+            
+            if "401" in error_msg or "unauthorized" in error_msg or "authentication" in error_msg:
+                logger.error("❌ Authentication failed - Check your LinkedIn email and password")
+                return {
+                    "error": "Authentication failed",
+                    "message": "Invalid LinkedIn credentials. Please check your email and password."
+                }
+            elif "429" in error_msg or "rate limit" in error_msg:
+                logger.error("❌ Rate limit exceeded - Too many requests to LinkedIn")
+                return {
+                    "error": "Rate limit exceeded",
+                    "message": "LinkedIn rate limit reached. Please wait an hour and try again, or use mock data."
+                }
+            elif "404" in error_msg or "not found" in error_msg:
+                logger.error(f"❌ Profile not found: {username}")
+                return {
+                    "error": "Profile not found",
+                    "message": f"LinkedIn profile '{username}' not found. Check the URL or try a public profile."
+                }
+            else:
+                logger.error(f"❌ Unexpected error: {auth_error}")
+                logger.info("Falling back to mock data")
+                return load_mock_data()
             
     except Exception as e:
         logger.error(f"Error in extract_linkedin_profile: {e}")

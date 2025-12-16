@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 # Dictionary to store active conversations
 active_indices = {}
 
-def process_profile(linkedin_url, api_key, use_mock, selected_model):
+def process_profile(linkedin_url, linkedin_email, linkedin_password, use_mock, selected_model):
     """Process a LinkedIn profile and generate initial facts.
     
     Args:
         linkedin_url: LinkedIn profile URL to process.
-        api_key: ProxyCurl API key.
+        linkedin_email: LinkedIn account email (optional).
+        linkedin_password: LinkedIn account password (optional).
         use_mock: Whether to use mock data.
         selected_model: LLM model to use.
         
@@ -45,17 +46,23 @@ def process_profile(linkedin_url, api_key, use_mock, selected_model):
             
         # Use a default URL for mock data if none provided
         if use_mock and not linkedin_url:
-            linkedin_url = "https://www.linkedin.com/in/leonkatsnelson/"
+            linkedin_url = "https://www.linkedin.com/in/williamhgates/"
             
         # Extract profile data
         profile_data = extract_linkedin_profile(
             linkedin_url,
-            api_key if not use_mock else None,
+            linkedin_email=linkedin_email if not use_mock else None,
+            linkedin_password=linkedin_password if not use_mock else None,
             mock=use_mock
         )
         
         if not profile_data:
-            return "Failed to retrieve profile data. Please check the URL or API key.", None
+            return "Failed to retrieve profile data. Please check your LinkedIn credentials or use mock data.", None
+        
+        # Check for error responses
+        if isinstance(profile_data, dict) and "error" in profile_data:
+            error_msg = profile_data.get("message", "Unknown error")
+            return f"Error: {error_msg}\n\nTip: Try checking 'Use Mock Data' to test the app.", None
         
         # Split data into nodes
         nodes = split_profile_data(profile_data)
@@ -161,17 +168,27 @@ def create_gradio_interface():
                         placeholder="https://www.linkedin.com/in/username/",
                         info="Paste the full LinkedIn profile URL here"
                     )
-                    api_key = gr.Textbox(
-                        label="ProxyCurl API Key (Optional - Leave empty for mock data)",
-                        placeholder="Your ProxyCurl API Key",
-                        type="password",
-                        value=config.PROXYCURL_API_KEY or "",
-                        info="Get your API key from https://nubela.co/proxycurl"
+                    
+                    linkedin_email = gr.Textbox(
+                        label="LinkedIn Email (Optional - Leave empty for mock data)",
+                        placeholder="Your LinkedIn email",
+                        type="email",
+                        value=config.LINKEDIN_EMAIL or "",
+                        info="Your personal LinkedIn account email"
                     )
+                    
+                    linkedin_password = gr.Textbox(
+                        label="LinkedIn Password (Optional - Leave empty for mock data)",
+                        placeholder="Your LinkedIn password",
+                        type="password",
+                        value=config.LINKEDIN_PASSWORD or "",
+                        info="Your personal LinkedIn account password"
+                    )
+                    
                     use_mock = gr.Checkbox(
                         label="Use Mock Data", 
                         value=True,
-                        info="Enable to test without API key"
+                        info="Enable to test without LinkedIn credentials"
                     )
                     model_dropdown = gr.Dropdown(
                         choices=available_models,
@@ -207,7 +224,7 @@ def create_gradio_interface():
             
             process_btn.click(
                 fn=process_profile,
-                inputs=[linkedin_url, api_key, use_mock, model_dropdown],
+                inputs=[linkedin_url, linkedin_email, linkedin_password, use_mock, model_dropdown],
                 outputs=[result_text, session_id]
             )
         
